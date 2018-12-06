@@ -1,9 +1,10 @@
 const path = require('path');
 const assert = require('assert');
+const generate = require('@babel/generator').default;
 const { genEntry } = require('../lib/compiler');
 const { parseTemplate, parsePages } = require('../lib/parser');
 const { resolveApp, resolveModule } = require('../lib/utils/resolve');
-const { removeFile, resolveFile, isNativeModule } = require('../lib/utils/file');
+const { resolveFile, isNativeModule } = require('../lib/utils/file');
 
 function resolveTest(dir) {
   return path.join(__dirname, '../test', dir);
@@ -12,7 +13,7 @@ function resolveTest(dir) {
 describe('utils', () => {
   describe('resolveApp', () => {
     it('should return a path relative to app', () => {
-      assert.equal(resolveApp('./test'), resolveTest('../node_modules/mocha/test'));
+      assert.equal(resolveApp('./test'), resolveTest('.'));
     });
   });
 
@@ -47,49 +48,32 @@ describe('utils', () => {
   describe('template', () => {
     it('should return template string', () => {
       const template = parseTemplate({ template: resolveTest('./assets/main.js') });
-      assert.equal(template, `import Vue from 'vue';
+      const { code } = generate(template);
+      assert.equal(code, `import Vue from 'vue';
 import store from '@/store';
 import App from '@/App';
-
 Vue.config.productionTip = false;
-
 const app = new Vue({
   store,
-  ...App,
+  ...App
 });
-app.$mount();
-
-export default {
-  config: {
-    pages: [
-      '^pages/b',
-    ],
-    window: {
-      backgroundTextStyle: 'light',
-    },
-  },
-};
-`);
+app.$mount();`);
     });
   });
 
   describe('genEntry', () => {
     const paths = {
-      pages: resolveTest('./assets/pages.js'),
+      config: resolveTest('./assets/config.js'),
       main: resolveTest('./assets/main.js'),
       template: resolveTest('./assets/main.js'),
-      app: resolveTest('./assets/app.json'),
-      dist: resolveTest('./assets'),
-      entry: resolveTest('./'),
+      entry: resolveTest('./dist'),
     };
     it('should return entry object', () => {
       const template = parseTemplate(paths);
       const pages = parsePages(paths);
-      genEntry(paths, pages, template).then((entry) => {
-        assert.equal(entry.app, resolveTest('./assets/main.js'));
-        assert.equal(entry['pages/a'], resolveTest('./pagesA.js'));
-        removeFile([entry['pages/a'], entry['pages/b']]);
-      });
+      const entry = genEntry(paths, pages, template);
+      assert.equal(entry.app, resolveTest('./assets/main.js'));
+      assert.equal(entry['pages/a'], resolveTest('./dist/pagesA.js'));
     });
   });
 });
